@@ -28,7 +28,7 @@ setup(
     author="Yuxiao QIN",
     url="https://github.com/yuxiao-qin/gf3merger",
     packages=find_packages(),
-    python_requires=">=3.11",
+    python_requires=">=3.8, <=3.10",  # 3.10 is the numba requirement
     install_requires=install_requires,
     # entry_points="""
     #     [console_scripts]
@@ -39,5 +39,5 @@ setup(
     extras_require={
         "test": tests_require,
         "doc": docs_require
-    },k
+    },
 )

@@ -3,20 +3,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 from gf3merger.utils import _read_rslc, _read_res
 
-def cross_interferogram(parent_slc_path:str, child_slc_path:str)->np.ndarray:
 
-    lines  = int(_read_res(parent_slc_path, "Last_line (w.r.t. original_master)"))
-    samples  = int(_read_res(parent_slc_path, "Last_pixel (w.r.t. original_master)"))
+def calculate_common_overlap(parent_slc_dir:str, child_slc_dir:str):
 
-    parent_slc = _read_rslc(parent_slc_path, lines=lines, samples=samples)
-    child_slc = _read_rslc(child_slc_path, lines=lines, samples=samples)
+    pass
 
-    # check_amplitude(parent_slc, child_slc)
+def get_cross_interferogram(parent_slc_dir:str, child_slc_dir:str)->np.ndarray:
+
+    parent_slc = _read_rslc(parent_slc_dir)
+    child_slc = _read_rslc(child_slc_dir)
 
     return parent_slc * np.conj(child_slc)
 
 def compensate_phase(cross_interf:np.ndarray):
     pass
+
 
 def check_amplitude(parent_slc, child_slc):
 
