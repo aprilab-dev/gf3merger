@@ -4,10 +4,6 @@ import matplotlib.pyplot as plt
 from gf3merger.utils import _read_rslc, _read_res
 
 
-def calculate_common_overlap(parent_slc_dir:str, child_slc_dir:str):
-
-    pass
-
 def get_cross_interferogram(parent_slc_dir:str, child_slc_dir:str)->np.ndarray:
 
     parent_slc = _read_rslc(parent_slc_dir)

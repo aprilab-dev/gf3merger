@@ -1,5 +1,6 @@
 import os
 
+import matplotlib.pyplot as plt
 import largestinteriorrectangle as lir
 import numpy as np
 from scipy.signal import medfilt2d
@@ -58,8 +59,14 @@ def _read_rslc(
 
     # get the shape of the image
     if lines is None or samples is None:
-        lines = int(_read_res(slc_dir, "Last_line (w.r.t. original_master)"))
-        samples = int(_read_res(slc_dir, "Last_pixel (w.r.t. original_master)"))
+        try:
+            linestr = _read_res(slc_dir, "Last_line (w.r.t. original_master)")
+            samplestr = _read_res(slc_dir, "Last_pixel (w.r.t. original_master)")
+        except ValueError:
+            linestr = _read_res(slc_dir, "Last_line (w.r.t. original_image)")
+            samplestr = _read_res(slc_dir, "Last_pixel (w.r.t. original_image)")
+        lines, samples = int(linestr), int(samplestr)
+
     shape = (lines, samples * 2)
 
     # read a binary file with numpy.memmap
@@ -105,9 +112,10 @@ def find_common_overlap(
     common_overlap = medfilt2d(common_overlap.astype(int), kernel_size=7)
     # find largest interior rectangle
     corners = lir.lir(common_overlap.astype(bool))
+    # upscale the corners
+    corners = corners * downsample_factor
 
     if debug:
-        import matplotlib.pyplot as plt
 
         plt.imshow(common_overlap)
         plt.savefig("common_overlap.png")
@@ -120,3 +128,28 @@ def find_common_overlap(
         plt.savefig("largest_interior_rectangle.png")
 
     return corners[1], corners[1] + corners[3], corners[0], corners[0] + corners[2]
+
+
+def plot_spectrum(slc_arr: np.ndarray, fname: str = "Spectrum.png"):
+
+    mag = np.zeros(slc_arr.shape[0])
+
+    # iterate over rows of the array
+    for signal in slc_arr.T:
+
+        # Compute FFT
+        spectrum = np.fft.fftshift(np.fft.fft(signal))
+
+        # Compute magnitude spectrum
+        magnitude = np.abs(spectrum)
+
+        mag += magnitude
+
+    # Plot magnitude spectrum
+    plt.clf()
+    plt.plot(mag)
+    plt.grid(True)
+    plt.ylabel('Magnitude')
+    plt.xlabel('Frequency (Hz)')
+    plt.savefig(fname)
+

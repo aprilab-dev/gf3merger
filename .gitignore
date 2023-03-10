@@ -133,3 +133,6 @@ dmypy.json
 
 # pyrightconfig.json
 pyrightconfig.json
+
+# pngs are excluded from the repo
+*.png
