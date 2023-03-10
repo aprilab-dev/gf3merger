@@ -4,6 +4,24 @@ import matplotlib.pyplot as plt
 from gf3merger.utils import _read_rslc, _read_res
 
 
+def merge_gf3(parent_slc_dir:str, child_slc_dir:str):
+
+    """
+    1. read parent and cild slc
+    >>> parent_slc = _read_rslc(parent_slc_dir)
+    >>> child_slc = _read_rslc(child_slc_dir)
+    2. find common overlap
+    >>> coords = find_common_overlap(parent_arr, child_arr, debug=True)
+    3. get cross interferogram (at common overlap area)
+    >>> cross_interf = parent_slc[coords] * np.conj(child_slc[coords])
+    4. compensate phase
+    >>> compensated_phase = merge_slc(cross_interf)
+    5. write back to disk  # dirty implementation, but let's deal with it later
+    >>> write_back_to_disk()
+    """
+
+    pass
+
 def get_cross_interferogram(parent_slc_dir:str, child_slc_dir:str)->np.ndarray:
 
     parent_slc = _read_rslc(parent_slc_dir)

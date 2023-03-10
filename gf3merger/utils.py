@@ -1,7 +1,7 @@
 import os
 
-import matplotlib.pyplot as plt
 import largestinteriorrectangle as lir
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import medfilt2d
 
@@ -85,7 +85,10 @@ def _read_rslc(
 
 
 def find_common_overlap(
-    parent_arr: np.ndarray, child_arr: np.ndarray, debug: bool = False
+    parent_arr: np.ndarray,
+    child_arr: np.ndarray,
+    downsample_factor: int = 20,
+    debug: bool = False,
 ) -> tuple[int, int, int, int]:
     """FIND_COMMON_OVERLAP() is a function to find the largest common overlap
     between two adjacent SLC images.
@@ -94,6 +97,8 @@ def find_common_overlap(
     ----------
     parent_arr : np.ndarray
     child_arr : np.ndarray
+    downsample_factor : int, optional
+        add a downsample factor to accelerate estimation process, by default 20
     debug : bool, optional
 
     Returns
@@ -102,21 +107,18 @@ def find_common_overlap(
         The (top, bottom, left, right) of the largest common overlap area.
     """
 
-    downsample_factor = 20
-
+    # construct a mask of common overlap area
     common_overlap = np.logical_and(np.abs(parent_arr) > 0, np.abs(child_arr) > 0)
-
-    # downsample the common_overlap area to speed up the calculation
+    # cpoy() is required to save array in contiguous memory
     common_overlap = np.copy(common_overlap[::downsample_factor, ::downsample_factor])
-    # filter out speckles in common overlap area
-    common_overlap = medfilt2d(common_overlap.astype(int), kernel_size=7)
+    # data-wash: filter out speckles in common overlap area
+    common_overlap = medfilt2d(common_overlap.astype(int), kernel_size=21)
     # find largest interior rectangle
     corners = lir.lir(common_overlap.astype(bool))
-    # upscale the corners
+    # upscale the corners back to original resolution
     corners = corners * downsample_factor
 
     if debug:
-
         plt.imshow(common_overlap)
         plt.savefig("common_overlap.png")
 
@@ -131,12 +133,10 @@ def find_common_overlap(
 
 
 def plot_spectrum(slc_arr: np.ndarray, fname: str = "Spectrum.png"):
-
     mag = np.zeros(slc_arr.shape[0])
 
     # iterate over rows of the array
     for signal in slc_arr.T:
-
         # Compute FFT
         spectrum = np.fft.fftshift(np.fft.fft(signal))
 
@@ -149,7 +149,6 @@ def plot_spectrum(slc_arr: np.ndarray, fname: str = "Spectrum.png"):
     plt.clf()
     plt.plot(mag)
     plt.grid(True)
-    plt.ylabel('Magnitude')
-    plt.xlabel('Frequency (Hz)')
+    plt.ylabel("Magnitude")
+    plt.xlabel("Frequency (Hz)")
     plt.savefig(fname)
-
