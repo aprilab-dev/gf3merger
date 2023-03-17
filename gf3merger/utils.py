@@ -87,7 +87,7 @@ def _read_rslc(
 def find_common_overlap(
     parent_arr: np.ndarray,
     child_arr: np.ndarray,
-    downsample_factor: int = 20,
+    downsample_factor: int = 10,
     debug: bool = False,
 ) -> tuple[int, int, int, int]:
     """FIND_COMMON_OVERLAP() is a function to find the largest common overlap
@@ -130,6 +130,7 @@ def find_common_overlap(
         plt.savefig("largest_interior_rectangle.png")
 
     return corners[1], corners[1] + corners[3], corners[0], corners[0] + corners[2]
+
 
 
 def plot_spectrum(slc_arr: np.ndarray, fname: str = "Spectrum.png"):
