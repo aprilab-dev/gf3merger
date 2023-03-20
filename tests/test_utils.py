@@ -1,7 +1,7 @@
 import os
 import pytest
 import numpy as np
-from gf3merger.utils import _read_res, _read_rslc, _write_rslc
+from gf3merger.utils import read_res, read_rslc, write_rslc
 
 
 @pytest.mark.parametrize(
@@ -15,7 +15,7 @@ def test___read_res(test_input, desired):
     """Unittest for _read_res()"""
 
     assert (
-        _read_res(
+        read_res(
             slc_dir=os.path.join(os.path.dirname(__file__), "data"),
             query_keyword=test_input,
         )
@@ -40,7 +40,7 @@ def test__read_rslc(tmpdir):
     with open(temppath, "wb") as f:
         f.write(input.tobytes())
 
-    actual = _read_rslc(tmpdir, lines, pixels)
+    actual = read_rslc(tmpdir, lines, pixels)
     desired = input_real + 1j * input_imag
 
     assert actual.all() == desired.all()
@@ -59,8 +59,8 @@ def test__write_rslc(tmpdir):
 
     # write to disk
     temppath = os.path.join(tmpdir, "slave_rsmp.raw")
-    _write_rslc(input, temppath)
+    write_rslc(input, temppath)
 
-    actual = _read_rslc(tmpdir, lines, pixels)
+    actual = read_rslc(tmpdir, lines, pixels)
 
     assert actual.all() == input.all()

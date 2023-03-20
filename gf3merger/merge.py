@@ -1,130 +1,144 @@
-from ctypes import util
-from logging import critical
 import os
-from re import X
-from sre_compile import isstring
+import logging
 import numpy as np
 import matplotlib.pyplot as plt
 from gf3merger import utils, config
 
-debug = config.DEBUG
+logger = logging.getLogger("sLogger")
+
+class GF3Merger:
+
+    def __init__(self, dir_slc:str, parent_date:str, child_date:str) -> None:
+
+        self.parent_date = parent_date
+        self.child_date = child_date
+        self.dir_slc = dir_slc
+        self.debug = config.DEBUG
+
+    @property
+    def export_dir(self):
+        return os.path.join(self.dir_slc, self.parent_date)
+
+    def merge(self):
+
+        # --------------------------------------------------
+        # 1. Read Parent and Child SLC
+        # --------------------------------------------------
+        logger.info(f"Reading SLCs for date {self.parent_date}.")
+        parent_arr = utils.read_rslc(os.path.join(self.dir_slc, self.parent_date))
+        child_arr = utils.read_rslc(os.path.join(self.dir_slc, self.child_date))
+
+        # --------------------------------------------------
+        # 2. Find Common Overlap
+        # --------------------------------------------------
+        logger.info(f"Finding common overlap area for images on date {self.parent_date}.")
+        coords = utils.find_common_overlap(parent_arr, child_arr, debug=True)
+
+        # --------------------------------------------------
+        # 3. Calibrate Phase
+        # --------------------------------------------------
+        logger.info(f"Calculate Phase Calibration.")
+        parent_cropped = parent_arr[coords[0]:coords[1], coords[2]:coords[3]]
+        child_cropped = child_arr[coords[0]:coords[1], coords[2]:coords[3]]
+
+        m, b = self._calibrate_phase(
+            parent = np.exp(1j * np.angle(parent_cropped)),
+            child = np.exp(1j * np.angle(child_cropped)),
+        )
+
+        # --------------------------------------------------
+        # 4. Calibrate Amplitude
+        # --------------------------------------------------
+        logger.info(f"Calculate Amplitude Calibration.")
+        calib_factor = self._calibrate_amplitude(parent_cropped, child_cropped)
+
+        child_corrected = child_arr.T * np.exp(1j * ((np.arange(parent_arr.shape[0]) - coords[0]) * m + b)) * calib_factor
+
+        # --------------------------------------------------
+        # 5. Write to Disk
+        # --------------------------------------------------
+        logger.info(f"Merging adjacent images after calibration.")
+        merged = self._concatenate(parent_arr, child_corrected.T, coords[0], coords[1])
+        fout = os.path.join(self.export_dir, "slave_rsmp.merged")
+        logger.info(f"Writing merged image to back to {fout}.")
+        utils.write_rslc(merged, fout)
 
 
-def merge_gf3(parent_slc_dir:str, child_slc_dir, debug:bool=debug):
+    def _calibrate_phase(self, parent, child):
 
-    # --------------------------------------------------
-    # 1. Read Parent and Child SLC
-    # --------------------------------------------------
-    parent_arr = utils._read_rslc(parent_slc_dir)
-    if isstring(child_slc_dir):
-        child_arr = utils._read_rslc(child_slc_dir)
-    else:
-        child_arr = child_slc_dir
+        # --------------------------------------------------
+        # 1. get cross interferogram (at common overlap area)
+        # --------------------------------------------------
+        cross_interf = parent * np.conj(child)
 
-    # --------------------------------------------------
-    # 2. Find Common Overlap
-    # --------------------------------------------------
-    coords = utils.find_common_overlap(parent_arr, child_arr, debug=True)
+        # --------------------------------------------------
+        # 2. compensate phase
+        # --------------------------------------------------
+        azimuth_modulation = np.angle(np.sum(cross_interf, axis=1, keepdims=False))
+        azimuth_modulation_unw = np.unwrap(azimuth_modulation)
 
-    # --------------------------------------------------
-    # 3. Calibrate Phase
-    # --------------------------------------------------
-    parent_cropped = parent_arr[coords[0]:coords[1], coords[2]:coords[3]]
-    child_cropped = child_arr[coords[0]:coords[1], coords[2]:coords[3]]
+        m, b = np.polyfit(np.arange(len(azimuth_modulation_unw)), azimuth_modulation_unw, 1)
 
-    m, b = calibrate_phase(
-        parent = np.exp(1j * np.angle(parent_cropped)),
-        child = np.exp(1j * np.angle(child_cropped)),
-        debug = debug
-    )
+        if self.debug:
+            plt.clf()
+            plt.plot(azimuth_modulation)
+            plt.savefig(os.path.join(self.export_dir, "wrapped_slope.png"))
+            plt.clf()
+            plt.plot(azimuth_modulation_unw)
+            plt.savefig(os.path.join(self.export_dir, "unwrapped_slope.png"))
+            plt.clf()
+            plt.plot(np.arange(len(azimuth_modulation_unw)) * m + b)
+            plt.savefig(os.path.join(self.export_dir, "unwrapped_slope_check.png"))
 
-    # --------------------------------------------------
-    # 4. Calibrate Amplitude
-    # --------------------------------------------------
-    calib_factor = calibrate_amplitude(parent_cropped, child_cropped, debug=debug)
+            child_corrected = child.T * np.exp(1j * (np.arange(parent.shape[0]) * m + b))
+            cross_interf_corrected = parent * np.conj(child_corrected.T)
+            plt.clf()
+            plt.imshow(np.angle(cross_interf_corrected),vmax=0.05, vmin=-0.05)
+            plt.colorbar()
+            plt.savefig(os.path.join(self.export_dir, "sanity check.png"))
 
-    child_corrected = child_arr.T * np.exp(1j * ((np.arange(parent_arr.shape[0]) - coords[0]) * m + b)) * calib_factor
-
-    # --------------------------------------------------
-    # 5. Write to Disk
-    # --------------------------------------------------
-    merged = concatenate(parent_arr, child_corrected.T, coords[0], coords[1])
-    utils._write_rslc(merged, "slave_rsmp.merged")
+        return  m, b
 
 
-def calibrate_phase(parent, child, debug):
+    def _calibrate_amplitude(self, parent, child):
 
-    # --------------------------------------------------
-    # 1. get cross interferogram (at common overlap area)
-    # --------------------------------------------------
-    cross_interf = parent * np.conj(child)
+        # calculate the ratio of amplitude difference
+        diff_ratio = np.abs(parent)/np.abs(child)
+        # data clean process
+        diff_ratio[diff_ratio==np.inf]=0
+        diff_ratio[diff_ratio==-np.inf]=0
+        diff_ratio[np.isnan(diff_ratio)]=0
 
-    # --------------------------------------------------
-    # 2. compensate phase
-    # --------------------------------------------------
-    azimuth_modulation = np.angle(np.sum(cross_interf, axis=1, keepdims=False))
-    azimuth_modulation_unw = np.unwrap(azimuth_modulation)
+        ratio_mean = np.mean(diff_ratio)
+        ratio_std = np.std(diff_ratio)
 
-    m, b = np.polyfit(np.arange(len(azimuth_modulation_unw)), azimuth_modulation_unw, 1)
+        if self.debug:
+            logger.info(f"The Mean of the Ratio for Amplitude Difference is {ratio_mean};")
+            logger.info(f"The Standard Deviation of the Ratio for Amplitude Difference is {ratio_std};")
+            plt.clf()
+            plt.imshow(diff_ratio,vmin=ratio_mean-ratio_std, vmax=ratio_mean+ratio_std)
+            plt.colorbar()
+            plt.savefig(os.path.join(self.export_dir, "diff_ratio.png"))
 
-    if debug:
-        plt.clf()
-        plt.plot(azimuth_modulation)
-        plt.savefig("wrapped_slope.png")
-        plt.clf()
-        plt.plot(azimuth_modulation_unw)
-        plt.savefig("unwrapped_slope.png")
-        plt.clf()
-        plt.plot(np.arange(len(azimuth_modulation_unw)) * m + b)
-        plt.savefig("unwrapped_slope_check.png")
+        return np.mean(diff_ratio)
 
-        child_corrected = child.T * np.exp(1j * (np.arange(parent.shape[0]) * m + b))
-        cross_interf_corrected = parent * np.conj(child_corrected.T)
-        plt.clf()
-        plt.imshow(np.angle(cross_interf_corrected),vmax=0.05, vmin=-0.05)
-        plt.colorbar()
-        plt.savefig("sanity check.png")
 
-    return  m, b
+    def _concatenate(self, parent, child, upper_coords, lower_coords):
 
-def calibrate_amplitude(parent, child, debug):
+        # Check if the upper part should be merged from parent or child.
+        upper_line = int(upper_coords/2)
+        lower_line = int((parent.shape[0] + lower_coords)/2)
 
-    # calculate the ratio of amplitude difference
-    diff_ratio = np.abs(parent)/np.abs(child)
-    # data clean process
-    diff_ratio[diff_ratio==np.inf]=0
-    diff_ratio[diff_ratio==-np.inf]=0
-    diff_ratio[np.isnan(diff_ratio)]=0
+        if np.mean(np.abs(parent[upper_line, :])) < np.mean(np.abs(parent[lower_line, :])):
+            parent, child = child, parent  # swap
 
-    ratio_mean = np.mean(diff_ratio)
-    ratio_std = np.std(diff_ratio)
+        merged = np.zeros_like(parent)
 
-    if debug:
-        print(f"The Mean of the Ratio for Amplitude Difference is {ratio_mean};")
-        print(f"The Standard Deviation of the Ratio for Amplitude Difference is {ratio_std};")
-        plt.clf()
-        plt.imshow(diff_ratio,vmin=ratio_mean-ratio_std, vmax=ratio_mean+ratio_std)
-        plt.colorbar()
-        plt.savefig("diff_ratio.png")
+        # takes parent as the upper part for merged
+        merged[0:upper_coords, :] = parent[0:upper_coords, :]
+        # takes child as the lower part for merged
+        merged[lower_coords:, :] = child[lower_coords:, :]
 
-    return np.mean(diff_ratio)
+        merged[upper_coords:lower_coords, :] = 0.5 * (parent[upper_coords:lower_coords, :] + child[upper_coords:lower_coords, :])
 
-def concatenate(parent, child, upper_coords, lower_coords):
-
-    # Check if the upper part should be merged from parent or child.
-    upper_line = int(upper_coords/2)
-    lower_line = int((parent.shape[0] + lower_coords)/2)
-
-    if np.mean(np.abs(parent[upper_line, :])) < np.mean(np.abs(parent[lower_line, :])):
-        parent, child = child, parent  # swap
-
-    merged = np.zeros_like(parent)
-
-    # takes parent as the upper part for merged
-    merged[0:upper_coords, :] = parent[0:upper_coords, :]
-    # takes child as the lower part for merged
-    merged[lower_coords:, :] = child[lower_coords:, :]
-
-    merged[upper_coords:lower_coords, :] = 0.5 * (parent[upper_coords:lower_coords, :] + child[upper_coords:lower_coords, :])
-
-    return merged
+        return merged

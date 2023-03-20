@@ -1,29 +1,13 @@
+from re import I
 import numpy as np
-from gf3merger.merge import merge_gf3
-from gf3merger.utils import _read_rslc, _read_res, find_common_overlap, plot_spectrum
+from gf3merger.merge import GF3Merger
+from gf3merger.utils import read_rslc, read_res, find_common_overlap, plot_spectrum
 
+def test_GF3Merger():
 
-def test_cross_interferogram():
-    parent_slc_path = "/data/tests/yuxiao/gf3_mosaic_test/stack/process/S01B01/20210225"
-    child_slc_path = "/data/tests/yuxiao/gf3_mosaic_test/stack/process/S01B01/20210226"
-    master_slc_path = "/data/tests/yuxiao/gf3_mosaic_test/stack/process/S01B01/20210127"
+    dir_slc = "/data/tests/yuxiao/gf3_mosaic_test/stack/process/S01B01"
+    parent_date = "20201129"
+    child_date = "20201130"
 
-    parent_slc = _read_rslc(parent_slc_path)
-    child_slc = _read_rslc(child_slc_path)
-    master_slc = _read_rslc(master_slc_path)
+    GF3Merger(dir_slc=dir_slc, parent_date=parent_date, child_date=child_date).merge()
 
-    coors = find_common_overlap(parent_slc, child_slc)
-
-    parent_slc = parent_slc[coors[0]:coors[1], coors[2]:coors[3]]
-    plot_spectrum(parent_slc, "parent_slc.png")
-    child_slc = child_slc[coors[0]:coors[1], coors[2]:coors[3]]
-    plot_spectrum(child_slc, "child_slc.png")
-
-    master_slc = master_slc[coors[0]:coors[1], coors[2]:coors[3]]
-    plot_spectrum(master_slc, "master_slc.png")
-
-def test_merge_gf3():
-    parent_slc_path = "/data/tests/yuxiao/gf3_mosaic_test/stack/process/S01B01/20201129"
-    child_slc_path = "/data/tests/yuxiao/gf3_mosaic_test/stack/process/S01B01/20201130"
-
-    merge_gf3(parent_slc_path, child_slc_path)
