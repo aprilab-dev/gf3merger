@@ -1,8 +1,12 @@
-import os
 import logging
-import numpy as np
+import os
+
+import largestinteriorrectangle as lir
 import matplotlib.pyplot as plt
-from gf3merger import utils, config
+import numpy as np
+from scipy.signal import medfilt2d
+
+from gf3merger import config, utils
 
 logger = logging.getLogger("sLogger")
 
@@ -32,7 +36,7 @@ class GF3Merger:
         # 2. Find Common Overlap
         # --------------------------------------------------
         logger.info(f"Finding common overlap area for images on date {self.parent_date}.")
-        coords = utils.find_common_overlap(parent_arr, child_arr, debug=True)
+        coords = self._find_common_overlap(parent_arr, child_arr)
 
         # --------------------------------------------------
         # 3. Calibrate Phase
@@ -62,7 +66,6 @@ class GF3Merger:
         fout = os.path.join(self.export_dir, "slave_rsmp.merged")
         logger.info(f"Writing merged image to back to {fout}.")
         utils.write_rslc(merged, fout)
-
 
     def _calibrate_phase(self, parent, child):
 
@@ -99,7 +102,6 @@ class GF3Merger:
 
         return  m, b
 
-
     def _calibrate_amplitude(self, parent, child):
 
         # calculate the ratio of amplitude difference
@@ -122,7 +124,6 @@ class GF3Merger:
 
         return np.mean(diff_ratio)
 
-
     def _concatenate(self, parent, child, upper_coords, lower_coords):
 
         # Check if the upper part should be merged from parent or child.
@@ -142,3 +143,55 @@ class GF3Merger:
         merged[upper_coords:lower_coords, :] = 0.5 * (parent[upper_coords:lower_coords, :] + child[upper_coords:lower_coords, :])
 
         return merged
+
+    def _find_common_overlap(
+        self,
+        parent: np.ndarray,
+        child: np.ndarray,
+        downsample_factor: int = 20,
+    ) -> tuple[int, int, int, int]:
+        """FIND_COMMON_OVERLAP() is a function to find the largest common overlap
+        between two adjacent SLC images.
+
+        Parameters
+        ----------
+        parent : np.ndarray
+        child : np.ndarray
+        downsample_factor : int, optional
+            add a downsample factor to accelerate estimation process, by default 20
+        debug : bool, optional
+
+        Returns
+        -------
+        tuple[int, int, int, int]
+            The (top, bottom, left, right) of the largest common overlap area.
+        """
+
+        buffer = 10
+
+        # construct a mask of common overlap area
+        common_overlap = np.logical_and(np.abs(parent) > 0, np.abs(child) > 0)
+        # cpoy() is required to save array in contiguous memory
+        common_overlap = np.copy(common_overlap[::downsample_factor, ::downsample_factor])
+        # data-wash: filter out speckles in common overlap area
+        common_overlap = medfilt2d(common_overlap.astype(int), kernel_size=11)
+        # find largest interior rectangle
+        corners = lir.lir(common_overlap.astype(bool))
+        # take buffer into consideration
+        corners = corners[0] + buffer, corners[1] + buffer, corners[2] - 2 * buffer, corners[3] - 2 * buffer
+
+        if self.debug:
+            plt.imshow(common_overlap)
+            plt.savefig(os.path.join(self.export_dir,"common_overlap.png"))
+
+            largest_interior_rect = common_overlap * 0
+            largest_interior_rect[
+                corners[1] : corners[1] + corners[3], corners[0] : corners[0] + corners[2]
+            ] = 10
+            plt.imshow(largest_interior_rect)
+            plt.savefig(os.path.join(self.export_dir,"largest_interior_rectangle.png"))
+
+        # upscale the corners back to original resolution
+        corners = tuple(c * downsample_factor for c in corners)
+
+        return corners[1], corners[1] + corners[3], corners[0], corners[0] + corners[2]

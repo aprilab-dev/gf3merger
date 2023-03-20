@@ -1,9 +1,8 @@
 import os
 import logging
-import largestinteriorrectangle as lir
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.signal import medfilt2d
+
 
 logger = logging.getLogger("sLogger")
 
@@ -92,58 +91,6 @@ def write_rslc(data, fout):
     # write the data to disk in raw binary format and np.int16 using tofile()
     with open(fout, 'wb') as f:
         dout.astype(np.int16).tofile(f)
-
-def find_common_overlap(
-    parent_arr: np.ndarray,
-    child_arr: np.ndarray,
-    downsample_factor: int = 20,
-    debug: bool = False,
-) -> tuple[int, int, int, int]:
-    """FIND_COMMON_OVERLAP() is a function to find the largest common overlap
-    between two adjacent SLC images.
-
-    Parameters
-    ----------
-    parent_arr : np.ndarray
-    child_arr : np.ndarray
-    downsample_factor : int, optional
-        add a downsample factor to accelerate estimation process, by default 20
-    debug : bool, optional
-
-    Returns
-    -------
-    tuple[int, int, int, int]
-        The (top, bottom, left, right) of the largest common overlap area.
-    """
-
-    buffer = 10
-
-    # construct a mask of common overlap area
-    common_overlap = np.logical_and(np.abs(parent_arr) > 0, np.abs(child_arr) > 0)
-    # cpoy() is required to save array in contiguous memory
-    common_overlap = np.copy(common_overlap[::downsample_factor, ::downsample_factor])
-    # data-wash: filter out speckles in common overlap area
-    common_overlap = medfilt2d(common_overlap.astype(int), kernel_size=11)
-    # find largest interior rectangle
-    corners = lir.lir(common_overlap.astype(bool))
-    # take buffer into consideration
-    corners = corners[0] + buffer, corners[1] + buffer, corners[2] - 2 * buffer, corners[3] - 2 * buffer
-
-    if debug:
-        plt.imshow(common_overlap)
-        plt.savefig("common_overlap.png")
-
-        largest_interior_rect = common_overlap * 0
-        largest_interior_rect[
-            corners[1] : corners[1] + corners[3], corners[0] : corners[0] + corners[2]
-        ] = 10
-        plt.imshow(largest_interior_rect)
-        plt.savefig("largest_interior_rectangle.png")
-
-    # upscale the corners back to original resolution
-    corners = tuple(c * downsample_factor for c in corners)
-
-    return corners[1], corners[1] + corners[3], corners[0], corners[0] + corners[2]
 
 def plot_spectrum(slc_arr: np.ndarray, fname: str = "Spectrum.png"):
     mag = np.zeros(slc_arr.shape[0])
