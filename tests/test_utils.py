@@ -1,7 +1,7 @@
 import os
 import pytest
 import numpy as np
-from gf3merger.utils import _read_res, _read_rslc
+from gf3merger.utils import _read_res, _read_rslc, _write_rslc
 
 
 @pytest.mark.parametrize(
@@ -45,3 +45,22 @@ def test__read_rslc(tmpdir):
 
     assert actual.all() == desired.all()
 
+def test__write_rslc(tmpdir):
+    """Unittest for _read_rslc()"""
+
+    # construct a fake slave_rsmp.raw
+    lines = 2000
+    pixels = 1000
+    input_real = np.random.randint(-2**15, 2**15-1, size=(lines, pixels), dtype=np.int16)
+    input_imag = np.random.randint(-2**15, 2**15-1, size=(lines, pixels), dtype=np.int16)
+
+    input = input_real + 1j * input_imag
+    input = input.astype(np.complex128)
+
+    # write to disk
+    temppath = os.path.join(tmpdir, "slave_rsmp.raw")
+    _write_rslc(input, temppath)
+
+    actual = _read_rslc(tmpdir, lines, pixels)
+
+    assert actual.all() == input.all()
