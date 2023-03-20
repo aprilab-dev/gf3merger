@@ -25,6 +25,12 @@ class GF3Merger:
 
     def merge(self):
 
+        logger.info("")
+        logger.info("=======================================")
+        logger.info(f"=          Merging {self.parent_date}           =")
+        logger.info("=======================================")
+        logger.info("")
+
         # --------------------------------------------------
         # 1. Read Parent and Child SLC
         # --------------------------------------------------
@@ -66,6 +72,8 @@ class GF3Merger:
         fout = os.path.join(self.export_dir, "slave_rsmp.merged")
         logger.info(f"Writing merged image to back to {fout}.")
         utils.write_rslc(merged, fout)
+        logger.info("")
+        logger.info(f"Merging for date {self.parent_date} completed.")
 
     def _calibrate_phase(self, parent, child):
 
