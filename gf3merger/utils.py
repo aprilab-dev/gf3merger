@@ -70,6 +70,8 @@ def read_rslc(
 
     # read a binary file with numpy.memmap
     frslc = os.path.join(slc_dir, "slave_rsmp.raw")
+    if not os.path.exists(frslc):  # mother image uses "image_crop.raw" as its name
+        frslc = os.path.join(slc_dir, "image_crop.raw")
     try:
         rslc_int = np.memmap(
             filename=frslc, dtype=np.int16, mode="r", offset=0, shape=shape
