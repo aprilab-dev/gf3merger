@@ -4,7 +4,7 @@ from gf3merger.merge import GF3Merger
 
 def test_GF3Merger():
 
-    dir_slc = "/data/tests/yuxiao/gf3_mosaic_test/stack/process/S01B01"
+    dir_slc = "fakepath"
     parent_date = "20210225"
     child_date = "20210226"
 
