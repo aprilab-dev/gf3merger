@@ -114,3 +114,4 @@ def plot_spectrum(slc_arr: np.ndarray, fname: str = "Spectrum.png"):
     plt.ylabel("Magnitude")
     plt.xlabel("Frequency (Hz)")
     plt.savefig(fname)
+

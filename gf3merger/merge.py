@@ -18,6 +18,7 @@ class GF3Merger:
         self.child_date = child_date
         self.dir_slc = dir_slc
         self.debug = config.DEBUG
+        self.dryrun = config.DRYRUN  # if True, do not write result to disk.
 
     @property
     def export_dir(self):
@@ -26,9 +27,9 @@ class GF3Merger:
     def merge(self):
 
         logger.info("")
-        logger.info("=======================================")
-        logger.info(f"=          Merging {self.parent_date}           =")
-        logger.info("=======================================")
+        logger.info("=============================================")
+        logger.info(f"=             Merging {self.parent_date}              =")
+        logger.info("=============================================")
         logger.info("")
 
         # --------------------------------------------------
@@ -43,6 +44,7 @@ class GF3Merger:
         # --------------------------------------------------
         logger.info(f"Finding common overlap area for images on date {self.parent_date}.")
         coords = self._find_common_overlap(parent_arr, child_arr)
+        logger.info(f"Common overlap lines ranging from {coords[0]} to {coords[1]}.")
 
         # --------------------------------------------------
         # 3. Calibrate Phase
@@ -64,18 +66,47 @@ class GF3Merger:
 
         child_corrected = child_arr.T * np.exp(1j * ((np.arange(parent_arr.shape[0]) - coords[0]) * m + b)) * calib_factor
 
+        # """ Add another debug session here: check the amplitude bias between MASTER and parent/child?
+        # """
+        # if self.debug:
+        #     master_arr = utils.read_rslc(os.path.join(self.dir_slc, "20210127"))
+        #     master_cropped = master_arr[coords[0]:coords[1], coords[2]:coords[3]]
+        #     self._calibrate_amplitude(master_cropped, parent_cropped, fout="master_vs_parent.png")
+        #     self._calibrate_amplitude(master_cropped, child_cropped, fout="master_vs_child.png")
+
         # --------------------------------------------------
         # 5. Write to Disk
         # --------------------------------------------------
-        logger.info(f"Merging adjacent images after calibration.")
-        merged = self._concatenate(parent_arr, child_corrected.T, coords[0], coords[1])
-        fout = os.path.join(self.export_dir, "slave_rsmp.merged")
-        logger.info(f"Writing merged image to back to {fout}.")
-        utils.write_rslc(merged, fout)
+        if not self.dryrun:
+            logger.info(f"Merging adjacent images after calibration.")
+            merged = self._concatenate(parent_arr, child_corrected.T, coords[0], coords[1])
+            fout = os.path.join(self.export_dir, "slave_rsmp.merged")
+            logger.info(f"Writing merged image to back to {fout}.")
+            utils.write_rslc(merged, fout)
+            self._cleanup()
         logger.info("")
         logger.info(f"Merging for date {self.parent_date} completed.")
 
-    def _calibrate_phase(self, parent, child):
+    def _cleanup(self):
+
+        # rename child directory to ~child
+        cur_child_dir = os.path.join(self.dir_slc, self.child_date)
+        new_child_dir = os.path.join(self.dir_slc, f"~{self.child_date}")
+        os.rename(cur_child_dir, new_child_dir)
+        logger.info(f"Renamed {cur_child_dir} to {new_child_dir}.")
+
+        # rename parent slave_rsmp.raw to slave_rsmp.raw.orig
+        cur_parent_rslc = os.path.join(self.dir_slc, self.parent_date, 'slave_rsmp.raw')
+        os.rename(cur_parent_rslc, f"{cur_parent_rslc}.orig")
+        logger.info(f"Renamed {cur_parent_rslc} to {cur_parent_rslc}.orig.")
+
+        # rename parent slave_rsmp.merged to slave_rsmp.raw
+        cur_parent_merged = os.path.join(self.dir_slc, self.parent_date, 'slave_rsmp.merged')
+        os.rename(cur_parent_merged, cur_parent_rslc)
+        logger.info(f"Renamed {cur_parent_merged} to {cur_parent_rslc}")
+
+
+    def _calibrate_phase(self, parent, child, fout=None):
 
         # --------------------------------------------------
         # 1. get cross interferogram (at common overlap area)
@@ -106,11 +137,12 @@ class GF3Merger:
             plt.clf()
             plt.imshow(np.angle(cross_interf_corrected),vmax=0.05, vmin=-0.05)
             plt.colorbar()
-            plt.savefig(os.path.join(self.export_dir, "sanity check.png"))
+            fout = f"sanity check {self.parent_date} {self.child_date}.png" if fout is None else fout
+            plt.savefig(os.path.join(self.export_dir, fout))
 
         return  m, b
 
-    def _calibrate_amplitude(self, parent, child):
+    def _calibrate_amplitude(self, parent, child, fout=None):
 
         # calculate the ratio of amplitude difference
         diff_ratio = np.abs(parent)/np.abs(child)
@@ -122,13 +154,20 @@ class GF3Merger:
         ratio_mean = np.mean(diff_ratio)
         ratio_std = np.std(diff_ratio)
 
+        # This is also a debug session
+        if fout is not None:
+            diff_ratio[diff_ratio<ratio_mean - 0.2] = 100  # a normalization
+
         if self.debug:
             logger.info(f"The Mean of the Ratio for Amplitude Difference is {ratio_mean};")
             logger.info(f"The Standard Deviation of the Ratio for Amplitude Difference is {ratio_std};")
             plt.clf()
-            plt.imshow(diff_ratio,vmin=ratio_mean-ratio_std, vmax=ratio_mean+ratio_std)
+            plt.rcParams['figure.figsize'] = [20, 10]
+            # plt.imshow(diff_ratio,vmin=ratio_mean-ratio_std, vmax=ratio_mean+ratio_std)
+            plt.imshow(diff_ratio,vmin=ratio_mean-0.1, vmax=ratio_mean+0.1)
             plt.colorbar()
-            plt.savefig(os.path.join(self.export_dir, "diff_ratio.png"))
+            fout = f"diff_ratio {self.parent_date} {self.child_date}.png" if fout is None else fout
+            plt.savefig(os.path.join(self.export_dir, fout))
 
         return np.mean(diff_ratio)
 
