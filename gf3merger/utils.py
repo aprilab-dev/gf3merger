@@ -13,8 +13,7 @@ def read_res(slc_dir: str, query_keyword: str) -> str:
     Parameters
     ----------
     slc_dir : str
-        The SLC directory that contains slave.res file. For example, you could have
-        `slc_dir = "stack/process/S01B01/20210225"`.
+        The SLC directory that contains slave.res file.
     query_keyword : str
         The keyword to query in slave.res file. Look for keywords in .res files
         that ends with semicolon.
