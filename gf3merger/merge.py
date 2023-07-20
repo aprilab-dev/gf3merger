@@ -25,12 +25,17 @@ class GF3Merger:
         return os.path.join(self.dir_slc, self.parent_date)
 
     def merge(self):
-
         logger.info("")
         logger.info("=============================================")
         logger.info(f"=             Merging {self.parent_date}              =")
         logger.info("=============================================")
         logger.info("")
+
+        # --------------------------------------------------
+        #  Sanity Check
+        # --------------------------------------------------
+        if self._sanity_check() is False:
+            return
 
         # --------------------------------------------------
         # 1. Read Parent and Child SLC
@@ -87,23 +92,51 @@ class GF3Merger:
         logger.info("")
         logger.info(f"Merging for date {self.parent_date} completed.")
 
+    def _sanity_check(self):
+
+        # if there is "original_slave_rsmp.raw" in the parent directory, it means the merging process has been done, then abort the process. 
+        if os.path.exists(os.path.join(self.dir_slc, self.parent_date, "original_slave_rsmp.raw")):
+            logger.info(f"Skipping {self.parent_date} because it has been merged.")
+            return False
+        return True
+
     def _cleanup(self):
 
         # rename child directory to ~child
         cur_child_dir = os.path.join(self.dir_slc, self.child_date)
-        new_child_dir = os.path.join(self.dir_slc, f"~{self.child_date}")
+        new_child_dir = os.path.join(self.dir_slc, f"original_{self.child_date}")
         os.rename(cur_child_dir, new_child_dir)
         logger.info(f"Renamed {cur_child_dir} to {new_child_dir}.")
 
         # rename parent slave_rsmp.raw to slave_rsmp.raw.orig
         cur_parent_rslc = os.path.join(self.dir_slc, self.parent_date, 'slave_rsmp.raw')
-        os.rename(cur_parent_rslc, f"{cur_parent_rslc}.orig")
-        logger.info(f"Renamed {cur_parent_rslc} to {cur_parent_rslc}.orig.")
+        new_parent_rslc = os.path.join(self.dir_slc, self.parent_date, 'original_slave_rsmp.raw')
+        os.rename(cur_parent_rslc,new_parent_rslc)
+        logger.info(f"Renamed {cur_parent_rslc} to {new_parent_rslc}.")
 
         # rename parent slave_rsmp.merged to slave_rsmp.raw
         cur_parent_merged = os.path.join(self.dir_slc, self.parent_date, 'slave_rsmp.merged')
         os.rename(cur_parent_merged, cur_parent_rslc)
         logger.info(f"Renamed {cur_parent_merged} to {cur_parent_rslc}")
+
+    def _restore(self):
+        
+        # rename child directory back to child
+        cur_child_dir = os.path.join(self.dir_slc, f"original_{self.child_date}")
+        new_child_dir = os.path.join(self.dir_slc, self.child_date)
+        os.rename(cur_child_dir, new_child_dir)
+        logger.info(f"Restored {cur_child_dir} to {new_child_dir}.")
+
+        # rename parent slave_rsmp.raw to slave_rsmp.merged
+        # delete the current slave_rsmp.raw file
+        orig_parent_rslc = os.path.join(self.dir_slc, self.parent_date, 'slave_rsmp.raw')
+        os.remove(orig_parent_rslc)
+        logger.info(f"Removed merged file: {orig_parent_rslc}")
+
+        # rename parent slave_rsmp.raw.orig to slave_rsmp.raw
+        cur_parent_rslc = os.path.join(self.dir_slc, self.parent_date, 'original_slave_rsmp.raw')
+        os.rename(cur_parent_rslc, orig_parent_rslc)
+        logger.info(f"Renamed {cur_parent_rslc} to {orig_parent_rslc}.")
 
 
     def _calibrate_phase(self, parent, child, fout=None):
