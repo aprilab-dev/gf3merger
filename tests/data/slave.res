@@ -1,10 +1,8 @@
 =====================================================
  SLAVE RESULTFILE:         slave.res
 
-Created by:             
+Created by:
 InSAR Processor:        Doris (Delft o-o Radar Interferometric Software)
-Version:                version  4.12 (05-05-2021)
-		     build 	Sun Jan 16 21:29:31 2022 (optimal)
 FFTW library:           used
 VECLIB library:         not used
 LAPACK library:         not used
@@ -254,7 +252,7 @@ NUMBER_OF_DATAPOINTS: 			157
    |                                                                    |
        Following part is appended at: Wed Jan  4 23:18:48 2023
                  Using Doris version  4.12 (05-05-2021)
-		     build 	Sun Jan 16 21:29:31 2022          
+		     build 	Sun Jan 16 21:29:31 2022
    |                                                                    |
    *--------------------------------------------------------------------*
 
@@ -282,7 +280,7 @@ Number of pixels (non-multilooked): 		21513
    |                                                                    |
        Following part is appended at: Wed Jan  4 23:55:09 2023
                  Using Doris version  4.12 (05-05-2021)
-		     build 	Sun Jan 16 21:29:31 2022          
+		     build 	Sun Jan 16 21:29:31 2022
    |                                                                    |
    *--------------------------------------------------------------------*
 
