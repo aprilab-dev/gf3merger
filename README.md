@@ -1,3 +1,7 @@
+<p align="center">
+    <img  width="256" src="icon.jpeg" alt="gf3merger">
+</p>
+
 # GF3Merger
 
 GF3Merger is a simple tool for mergering adjacent GF3 images after coregistration in doris.
