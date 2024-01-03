@@ -70,6 +70,7 @@ class GF3Merger:
         calib_factor = self._calibrate_amplitude(parent_cropped, child_cropped)
 
         child_corrected = child_arr.T * np.exp(1j * ((np.arange(parent_arr.shape[0]) - coords[0]) * m + b)) * calib_factor
+        del child_arr, parent_cropped, child_cropped  # release some memory
 
         # """ Add another debug session here: check the amplitude bias between MASTER and parent/child?
         # """
@@ -85,6 +86,7 @@ class GF3Merger:
         if not self.dryrun:
             logger.info(f"Merging adjacent images after calibration.")
             merged = self._concatenate(parent_arr, child_corrected.T, coords[0], coords[1])
+            del parent_arr, child_corrected  # release some memory
             fout = os.path.join(self.export_dir, "slave_rsmp.merged")
             logger.info(f"Writing merged image to back to {fout}.")
             utils.write_rslc(merged, fout)
